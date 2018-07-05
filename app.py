@@ -113,7 +113,8 @@ class CustomContainer(object):
 
 def _get_living_container():
     LIVING_CONTAINER.clear()
-    client = docker.from_env()
+    # client = docker.from_env()
+    client = docker.DockerClient(base_url='unix://var/run/docker.sock')
     container_list = client.containers.list(all=True)
     for i, container in enumerate(container_list, 1):
         t_dict = dict()
