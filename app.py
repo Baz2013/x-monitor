@@ -20,6 +20,10 @@ LIVING_CONTAINER = {
     'c1': {'container_id': 'b0ca7e6131c3', 'name': 'redis'}
 }
 
+RESURN_OPT_STATUS = {
+    'CLEAN_SUCCESS': {'message': 'clean success', 'opt': 'clean'},
+    'CLEAN_FAIL': {'message': 'clean fail', 'opt': 'clean'}
+}
 
 @app.route('/')
 def hello_world():
@@ -113,11 +117,7 @@ class CustomContainer(object):
 
 def _get_living_container():
     LIVING_CONTAINER.clear()
-    sys_str = platform.system()
-    if sys_str == "Windows":
-        client = docker.from_env()
-    else:
-        client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+    client = _get_client()
     container_list = client.containers.list(all=True)
     for i, container in enumerate(container_list, 1):
         t_dict = dict()
@@ -127,6 +127,22 @@ def _get_living_container():
         t_dict['status'] = container.status
         index = 'c%d' % (i, )
         LIVING_CONTAINER[index] = t_dict
+
+    client.close()
+
+
+def _get_client():
+    sys_str = platform.system()
+    if sys_str == "Windows":
+        client = docker.from_env()
+    else:
+        client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+    return client
+
+
+def abort_if_index_doesnt_exist(index):
+    if index not in LIVING_CONTAINER:
+        abort(404, message="LIVING_CONTAINER {} doesn't exist".format(index))
 
 
 class DockerMonitor(Resource):
@@ -152,7 +168,14 @@ class DockerClean(Resource):
     清理已经停止运行的容器
     """
     def get(self, index):
-        return LIVING_CONTAINER[index]
+        abort_if_index_doesnt_exist(index)
+        client = _get_client()
+        container = LIVING_CONTAINER.get(index)
+        container_object = client.containers.get(container.get("container_id"))
+        container_object.remove()
+        del LIVING_CONTAINER[index]
+        client.close()
+        return RESURN_OPT_STATUS['CLEAN_SUCCESS']
 
 
 class DockerRestart(Resource):
