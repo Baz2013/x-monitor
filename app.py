@@ -3,7 +3,7 @@
 from flask import Flask, jsonify
 from flask_restful import reqparse, abort, Api, Resource
 import docker
-
+import platform
 
 import json
 
@@ -113,8 +113,11 @@ class CustomContainer(object):
 
 def _get_living_container():
     LIVING_CONTAINER.clear()
-    # client = docker.from_env()
-    client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+    sys_str = platform.system()
+    if sys_str == "Windows":
+        client = docker.from_env()
+    else:
+        client = docker.DockerClient(base_url='unix://var/run/docker.sock')
     container_list = client.containers.list(all=True)
     for i, container in enumerate(container_list, 1):
         t_dict = dict()
@@ -135,10 +138,38 @@ class DockerMonitor(Resource):
         return LIVING_CONTAINER
 
 
+class DockerStop(Resource):
+    """
+
+    """
+    def get(self, index):
+        print '---->' + index
+        return LIVING_CONTAINER[index]
+
+
+class DockerClean(Resource):
+    """
+    清理已经停止运行的容器
+    """
+    def get(self, index):
+        return LIVING_CONTAINER[index]
+
+
+class DockerRestart(Resource):
+    """
+    重启容器
+    """
+    def get(self, index):
+        return LIVING_CONTAINER[index]
+
+
 # Actually setup the Api resource routing here
 api.add_resource(TodoList, '/todos')
 api.add_resource(Todo, '/todos/<todo_id>')
 api.add_resource(DockerMonitor, '/docker')
+api.add_resource(DockerStop, '/docker/stop/<index>')  # 停止正在运行中容器
+api.add_resource(DockerClean, '/docker/clean/<index>')  # 清理已经停止运行的容器
+api.add_resource(DockerRestart, '/docker/restart/<index>')  # 重启容器
 
 if __name__ == '__main__':
     app.run()
